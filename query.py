@@ -1,9 +1,9 @@
-import faiss
-import pickle
-from sentence_transformers import SentenceTransformer
-import os
-from dotenv import load_dotenv
-from openai import OpenAI
+# import faiss
+# import pickle
+# from sentence_transformers import SentenceTransformer
+# import os
+# from dotenv import load_dotenv
+# from openai import OpenAI
 
 
 # #1 load the same embedding model
@@ -47,114 +47,218 @@ from openai import OpenAI
 
 
 
+"""                              USING OPENAI_API                    """
 
-load_dotenv()
+# load_dotenv()
 
-api_key= os.getenv("OPENAI_API_KEY")
+# api_key= os.getenv("OPENAI_API_KEY")
 
-if not api_key:
-    raise ValueError("OPENAI_API_KEY not found please check you .env file")
+# if not api_key:
+#     raise ValueError("OPENAI_API_KEY not found please check you .env file")
 
-##2 initialize OPENAI client 
-client = OpenAI(api_key=api_key)
+# ##2 initialize OPENAI client 
+# client = OpenAI(api_key=api_key)
 
-##3Load the embedding model
-model= SentenceTransformer("all-MiniLM-L6-v2")
+# ##3Load the embedding model
+# model= SentenceTransformer("all-MiniLM-L6-v2")
 
-##4. load the saved FAISS index
-index= faiss.read_index("vector_store/resume.index")
+# ##4. load the saved FAISS index
+# index= faiss.read_index("vector_store/resume.index")
 
-##5. Load the original text chunks
+# ##5. Load the original text chunks
+# with open("vector_store/chunks.pkl", "rb") as file:
+#     chunks= pickle.load(file)
+
+# def search_resume(question, top_k=3):
+#     ##Step1: Convert question into an embedding
+#     question_embedding = model.encode(
+#         [question],
+#         convert_to_numpy=True)
+
+#     ##Step 2. normalize the question embedding
+#     faiss.normalize_L2(question_embedding)
+
+#     ##Step 3. Retrieve relevent chunks from FAISS
+#     k= min(top_k, index.ntotal)
+#     scores, indices= index.search(question_embedding, k)
+
+#     retrieved_chunks= []
+
+#     for score, idx in zip(scores[0], indices[0]):
+#         if idx == -1:
+#             continue
+
+#         retrieved_chunks.append(chunks[idx])
+
+#     if not retrieved_chunks:
+#         print("no relevent information found in this resume")
+#         return 
+
+#     ##Step 4. combine retrieved chunks into context
+#     context= "\n\n".join(retrieved_chunks)
+
+#     ##step 5. create a prompt for LLM
+#     prompt= f"""
+# you are a resume assistanat.
+# Answer the user's question using only the information provided in the resume context. 
+# Instructions:
+# -Give a clear and direct answer.
+# Do not invent facts or experience.
+# If the answer is not available in the context,
+# say that the information is not available in the resume.
+
+# Resume context:
+# {context}
+
+# User Question:
+# {question}
+
+# Answer:
+# """
+#     # ##step6. send prompt to OpenAI
+#     # response= client.responses.create(
+#     #     model="gpt-4.1-mini",
+#     #     input=prompt)
+
+#     # ##Step 7. print the final generated answer
+#     # print("\nYour question:", question)
+#     # print("\nYour Answer:")
+#     # print(response.output_text)
+
+#     from openai import RateLimitError, APIError
+
+#     try:
+#         response = client.responses.create(
+#             model="gpt-4.1-mini",
+#             input=prompt
+#         )
+
+#         print("\nFinal Answer:")
+#         print(response.output_text)
+
+#     except RateLimitError as e:
+#         if getattr(e, "code", None) == "credit_balance_exhausted":
+#             print("\nYour OpenAI API credits are exhausted.")
+#             print("Check your API billing balance.")
+#         else:
+#             print("\nOpenAI API quota or rate limit error:", e)
+
+#     except APIError as e:
+#         print("\nOpenAI API error:", e)
+
+
+# ##Step8. Ask a question
+# if __name__ == "__main__":
+#     question = input("Ask something about your resume: ").strip()
+
+#     if question:
+#         search_resume(question)
+#     else:
+#         print("Please enter a question")
+
+# print("Query script reached the end")
+
+"""                     USING  HUGGING FACE MODEL          """
+
+
+
+
+import faiss
+import pickle
+from sentence_transformers import SentenceTransformer
+from transformers import pipeline
+
+
+# 2. Load the Hugging Face generation model
+# generator = pipeline(
+#     "text-generation",
+#     model="Qwen/Qwen2.5-1.5B-Instruct"
+# )
+generator = pipeline(
+    "text-generation",
+    model="Qwen/Qwen2.5-0.5B-Instruct",
+    device=-1
+)
+
+
+# 3. Load your embedding model
+embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+
+# 4. Load the FAISS index
+index = faiss.read_index("vector_store/resume.index")
+
 with open("vector_store/chunks.pkl", "rb") as file:
-    chunks= pickle.load(file)
+    chunks = pickle.load(file)
 
+
+# 5. Your search function
 def search_resume(question, top_k=3):
-    ##Step1: Convert question into an embedding
-    question_embedding = model.encode(
+    question_embedding = embedding_model.encode(
         [question],
-        convert_to_numpy=True)
+        convert_to_numpy=True
+    )
 
-    ##Step 2. normalize the question embedding
     faiss.normalize_L2(question_embedding)
 
-    ##Step 3. Retrieve relevent chunks from FAISS
-    k= min(top_k, index.ntotal)
-    scores, indices= index.search(question_embedding, k)
+    scores, indices = index.search(question_embedding, top_k)
 
-    retrieved_chunks= []
+    # Collect relevant chunks
+    context = "\n\n".join(
+        chunks[i]
+        for i in indices[0]
+        if i >= 0
+    )
 
-    for score, idx in zip(scores[0], indices[0]):
-        if idx == -1:
-            continue
+    # Prepare prompt
+    prompt = f"""
+    You are a resume assistant.
+    Answer only using the provided resume context.
+    Do not invent information.
 
-        retrieved_chunks.append(chunks[idx])
+    Resume Context:
+    {context}
 
-    if not retrieved_chunks:
-        print("no relevent information found in this resume")
-        return 
+    Question:
+    {question}
 
-    ##Step 4. combine retrieved chunks into context
-    context= "\n\n".join(retrieved_chunks)
+    Answer:
+    """
+    print("Context retrieved successfully.")
+    print("Starting Hugging Face generation...")
 
-    ##step 5. create a prompt for LLM
-    prompt= f"""
-you are a resume assistanat.
-Answer the user's question using only the information provided in the resume context. 
-Instructions:
--Give a clear and direct answer.
-Do not invent facts or experience.
-If the answer is not available in the context,
-say that the information is not available in the resume.
+    print("\nGenerating answer...")
 
-Resume context:
-{context}
+    response = generator(
+        prompt,
+        # max_new_tokens=200,
+        max_new_tokens=50,
+        do_sample=False,
+        return_full_text=False
+    )
 
-User Question:
-{question}
+    answer = response[0]["generated_text"]
 
-Answer:
-"""
-    # ##step6. send prompt to OpenAI
-    # response= client.responses.create(
-    #     model="gpt-4.1-mini",
-    #     input=prompt)
-
-    # ##Step 7. print the final generated answer
-    # print("\nYour question:", question)
-    # print("\nYour Answer:")
-    # print(response.output_text)
-    from openai import RateLimitError, APIError
-
-    try:
-        response = client.responses.create(
-            model="gpt-4.1-mini",
-            input=prompt
-        )
-
-        print("\nFinal Answer:")
-        print(response.output_text)
-
-    except RateLimitError as e:
-        if getattr(e, "code", None) == "credit_balance_exhausted":
-            print("\nYour OpenAI API credits are exhausted.")
-            print("Check your API billing balance.")
-        else:
-            print("\nOpenAI API quota or rate limit error:", e)
-
-    except APIError as e:
-        print("\nOpenAI API error:", e)
+    print("\nFinal Answer:")
+    print(answer.strip())
 
 
-##Step8. Ask a question
-if __name__ == "__main__":
-    question = input("Ask something about your resume: ").strip()
+    # # Generate answer using Hugging Face
+    # response = generator(
+    #     prompt,
+    #     max_new_tokens=200,
+    #     do_sample=False,
+    #     return_full_text=False
+    # )
+    # print("\nFinal Answer:")
+    # print(response[0]["generated_text"].strip())
 
-    if question:
-        search_resume(question)
-    else:
-        print("Please enter a question")
 
-print("Query script reached the end")
+# 6. Take user input 
+question = input("Ask something about your resume: ")
+search_resume(question)
+
+
             
 
 
