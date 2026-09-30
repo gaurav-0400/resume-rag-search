@@ -237,10 +237,11 @@ def search_resume(question, top_k=3):
         return_full_text=False
     )
 
-    answer = response[0]["generated_text"]
+    answer = response[0]["generated_text"].strip()
+    return answer
 
-    print("\nFinal Answer:")
-    print(answer.strip())
+    # print("\nFinal Answer:")
+    # print(answer.strip())
 
 
     # # Generate answer using Hugging Face
@@ -254,9 +255,9 @@ def search_resume(question, top_k=3):
     # print(response[0]["generated_text"].strip())
 
 
-# 6. Take user input 
-question = input("Ask something about your resume: ")
-search_resume(question)
+# # 6. Take user input 
+# question = input("Ask something about your resume: ")
+# search_resume(question)
 
 
             

@@ -1,0 +1,33 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Resume AI Assistant</title>
+    <link rel="stylesheet"
+          href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <main class="container">
+        <h1>Resume AI Assistant</h1>
+        <p>Ask questions about my resume and projects.</p>
+
+        <form method="POST">
+            <textarea
+                name="question"
+                placeholder="Ask something about your resume..."
+                required>{{ question }}</textarea>
+
+            <button type="submit">Ask Question</button>
+        </form>
+
+        {% if answer %}
+        <section class="answer">
+            <h2>Answer</h2>
+            <p>{{ answer }}</p>
+        </section>
+        {% endif %}
+    </main>
+</body>
+</html>

@@ -1,0 +1,52 @@
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f7fb;
+    margin: 0;
+    padding: 40px 16px;
+    color: #1f2937;
+}
+
+.container {
+    max-width: 760px;
+    margin: 0 auto;
+    background: white;
+    padding: 32px;
+    border-radius: 16px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+}
+
+h1 {
+    margin-top: 0;
+    color: #176b67;
+}
+
+textarea {
+    width: 100%;
+    min-height: 100px;
+    box-sizing: border-box;
+    padding: 14px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    font: inherit;
+    resize: vertical;
+}
+
+button {
+    margin-top: 12px;
+    padding: 12px 20px;
+    background: #176b67;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+}
+
+.answer {
+    margin-top: 24px;
+    padding: 20px;
+    background: #eef8f6;
+    border-radius: 10px;
+    line-height: 1.7;
+    overflow-wrap: anywhere;
+}
