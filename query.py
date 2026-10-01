@@ -288,59 +288,145 @@
 
 
 
+# import os
+# import pickle
+# import faiss
+
+# from dotenv import load_dotenv
+# from groq import Groq
+# from sentence_transformers import SentenceTransformer
+
+# load_dotenv()
+
+# api_key = os.environ.get("GROQ_API_KEY")
+
+# if not api_key:
+#     raise RuntimeError("GROQ_API_KEY is missing from .env")
+
+# client = Groq(api_key=api_key)
+
+
+# # Load the embedding model
+# embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
+
+
+# # Load the FAISS index
+# index = faiss.read_index("vector_store/resume.index")
+
+
+# # Load resume text chunks
+# with open("vector_store/chunks.pkl", "rb") as file:
+#     chunks = pickle.load(file)
+
+
+# def search_resume(question, top_k=3):
+#     """
+#     Search the resume using FAISS and generate an answer using Groq.
+#     """
+
+#     # Step 1: Convert the question into an embedding
+#     question_embedding = embedding_model.encode(
+#         [question],
+#         convert_to_numpy=True
+#     )
+
+#     # Step 2: Normalize the embedding
+#     faiss.normalize_L2(question_embedding)
+
+#     # Step 3: Search for relevant chunks
+#     scores, indices = index.search(question_embedding, top_k)
+
+#     # Step 4: Build context from the retrieved chunks
+#     retrieved_chunks = [
+#         chunks[i]
+#         for i in indices[0]
+#         if 0 <= i < len(chunks)
+#     ]
+
+#     if not retrieved_chunks:
+#         return "I could not find relevant information in the resume."
+
+#     context = "\n\n".join(retrieved_chunks)
+
+#     # Step 5: Generate an answer using the hosted LLM
+#     response = client.chat.completions.create(
+#         # model="llama-3.3-70b-versatile",  ################################
+#         model="openai/gpt-oss-120b",
+#         messages=[
+#             {
+#                 "role": "system",
+#                 "content": (
+#                     "You are a resume assistant. Answer only using "
+#                     "the provided resume context. Do not invent "
+#                     "personal details or experience. If the answer "
+#                     "is unavailable in the context, say that the "
+#                     "resume does not provide that information."
+#                 )
+#             },
+#             {
+#                 "role": "user",
+#                 "content": (
+#                     f"Resume Context:\n{context}\n\n"
+#                     f"Question:\n{question}"
+#                 )
+#             }
+#         ],
+#         temperature=0.2,
+#         max_completion_tokens=250
+#     )
+
+#     # Step 6: Return the generated answer
+#     answer = response.choices[0].message.content
+
+#     return answer.strip() if answer else "No answer was generated."
+
+
+
+
 import os
 import pickle
-import faiss
 
 from dotenv import load_dotenv
 from groq import Groq
-from sentence_transformers import SentenceTransformer
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.metrics.pairwise import cosine_similarity
 
 load_dotenv()
 
 api_key = os.environ.get("GROQ_API_KEY")
 
 if not api_key:
-    raise RuntimeError("GROQ_API_KEY is missing from .env")
+    raise RuntimeError("GROQ_API_KEY is missing.")
 
 client = Groq(api_key=api_key)
 
-
-# Load the embedding model
-embedding_model = SentenceTransformer("all-MiniLM-L6-v2")
-
-
-# Load the FAISS index
-index = faiss.read_index("vector_store/resume.index")
-
-
-# Load resume text chunks
+# Load the resume chunks created by ingest.py
 with open("vector_store/chunks.pkl", "rb") as file:
     chunks = pickle.load(file)
 
+# Build a lightweight text retrieval index
+vectorizer = TfidfVectorizer(
+    stop_words="english",
+    ngram_range=(1, 2)
+)
+
+chunk_vectors = vectorizer.fit_transform(chunks)
+
 
 def search_resume(question, top_k=3):
-    """
-    Search the resume using FAISS and generate an answer using Groq.
-    """
+    question_vector = vectorizer.transform([question])
 
-    # Step 1: Convert the question into an embedding
-    question_embedding = embedding_model.encode(
-        [question],
-        convert_to_numpy=True
-    )
+    scores = cosine_similarity(
+        question_vector,
+        chunk_vectors
+    ).flatten()
 
-    # Step 2: Normalize the embedding
-    faiss.normalize_L2(question_embedding)
+    top_indices = scores.argsort()[::-1][:top_k]
 
-    # Step 3: Search for relevant chunks
-    scores, indices = index.search(question_embedding, top_k)
-
-    # Step 4: Build context from the retrieved chunks
     retrieved_chunks = [
         chunks[i]
-        for i in indices[0]
-        if 0 <= i < len(chunks)
+        for i in top_indices
+        if scores[i] > 0
     ]
 
     if not retrieved_chunks:
@@ -348,10 +434,8 @@ def search_resume(question, top_k=3):
 
     context = "\n\n".join(retrieved_chunks)
 
-    # Step 5: Generate an answer using the hosted LLM
     response = client.chat.completions.create(
-        # model="llama-3.3-70b-versatile",  ################################
-        model="openai/gpt-oss-120b",
+        model="llama-3.3-70b-versatile",
         messages=[
             {
                 "role": "system",
@@ -375,7 +459,5 @@ def search_resume(question, top_k=3):
         max_completion_tokens=250
     )
 
-    # Step 6: Return the generated answer
     answer = response.choices[0].message.content
-
     return answer.strip() if answer else "No answer was generated."
