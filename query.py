@@ -404,6 +404,14 @@ client = Groq(api_key=api_key)
 with open("vector_store/chunks.pkl", "rb") as file:
     chunks = pickle.load(file)
 
+if not isinstance(chunks, list) or not chunks:
+    raise ValueError("chunks.pkl must contain a non-empty list.")
+
+chunks = [str(chunk) for chunk in chunks if str(chunk).strip()]
+
+if not chunks:
+    raise ValueError("No valid resume text chunks found.")
+
 # Build a lightweight text retrieval index
 vectorizer = TfidfVectorizer(
     stop_words="english",
@@ -414,7 +422,26 @@ chunk_vectors = vectorizer.fit_transform(chunks)
 
 
 def search_resume(question, top_k=3):
-    question_vector = vectorizer.transform([question])
+
+    question_lower = question.lower()
+
+    # Expand common questions with related resume terms
+    query_expansions = {
+        "education": "education qualification degree BCA CGPA",
+        "qualification": "education qualification degree BCA CGPA",
+        "cgpa": "CGPA BCA Bachelor Computer Applications",
+        "experience": "experience internship developer Python Django AI ML",
+        "skills": "skills Python Django Flask machine learning",
+        "projects": "projects developed applications",
+    }
+
+    expanded_question = question
+
+    for keyword, related_terms in query_expansions.items():
+        if keyword in question_lower:
+            expanded_question += " " + related_terms
+
+    question_vector = vectorizer.transform([expanded_question])
 
     scores = cosine_similarity(
         question_vector,
@@ -430,21 +457,23 @@ def search_resume(question, top_k=3):
     ]
 
     if not retrieved_chunks:
-        return "I could not find relevant information in the resume."
+        return (
+            "I could not find relevant information in the resume. "
+            "Try using keywords from your resume."
+        )
 
     context = "\n\n".join(retrieved_chunks)
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        # model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-20b",
         messages=[
             {
                 "role": "system",
                 "content": (
                     "You are a resume assistant. Answer only using "
-                    "the provided resume context. Do not invent "
-                    "personal details or experience. If the answer "
-                    "is unavailable in the context, say that the "
-                    "resume does not provide that information."
+                    "the provided resume context. Do not invent details. "
+                    "If information is unavailable, say so."
                 )
             },
             {
