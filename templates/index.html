@@ -1,4 +1,4 @@
-
+<!-- 
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -28,6 +28,70 @@
             <p>{{ answer }}</p>
         </section>
         {% endif %}
+    </main>
+</body>
+</html> -->
+
+
+
+
+
+
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Resume AI Assistant</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+</head>
+
+<body>
+    <main class="container">
+        <header class="header">
+            <h1>Resume AI Assistant</h1>
+            <p>
+                Ask questions about my skills, education,
+                experience, and projects.
+            </p>
+        </header>
+
+        <form method="POST">
+            <label for="question">Your question</label>
+
+            <textarea
+                id="question"
+                name="question"
+                placeholder="e.g. What projects have I worked on?"
+                required
+            >{{ question }}</textarea>
+
+            <button type="submit">Ask Question</button>
+        </form>
+
+        {% if error %}
+            <section class="error" role="alert">
+                <h2>Something went wrong</h2>
+                <p>{{ error }}</p>
+            </section>
+        {% endif %}
+
+        {% if answer %}
+            <section class="answer">
+                <h2>Answer</h2>
+                <p>{{ answer }}</p>
+            </section>
+        {% endif %}
+
+        <footer>
+            <p>Powered by Retrieval-Augmented Generation (RAG)</p>
+        </footer>
     </main>
 </body>
 </html>
